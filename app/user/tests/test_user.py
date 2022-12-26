@@ -124,15 +124,15 @@ class PrivateUserAPITest(TestCase):
         res = self.client.post(ME_URL, {})
         self.assertEqual(res.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
 
-    # def test_update(self):
-    #     new_data = {
-    #         'name': 'new name',
-    #         'password': 'new_pass',
-    #     }
-    #
-    #     res = self.client.patch(ME_URL, new_data)
-    #     self.user.refresh_from_db()
-    #     self.assertEqual(self.user.name, new_data['name'])
-    #     self.assertTrue(self.user.check_password(new_data['password']))
-    #     self.assertEqual(res.status_code, status.HTTP_200_OK)
+    def test_update(self):
+        new_data = {
+            'name': 'new name',
+            'password': 'new_pass',
+        }
+
+        res = self.client.patch(ME_URL, new_data)
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.name, new_data['name'])
+        self.assertTrue(self.user.check_password(new_data['password']))
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
 
