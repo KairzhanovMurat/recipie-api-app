@@ -162,3 +162,75 @@ class TestPrivateRecipeAPI(TestCase):
         res = self.client.delete(recipe_detail(recipe.id))
         self.assertEqual(res.status_code, status.HTTP_404_NOT_FOUND)
         self.assertTrue(models.Recipe.objects.filter(id=recipe.id))
+
+    def test_create_tag(self):
+        data = {
+            'title': 'sample title',
+            'description': 'test desc',
+            'time_mins': 5,
+            'price': Decimal('5.75'),
+            'tags': [{'name': 'first'},
+                     {'name': 'second'}]
+        }
+        res = self.client.post(RECIPE_URL, data, format='json')
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        recipes = models.Recipe.objects.filter(user=self.user)
+        self.assertEqual(1, recipes.count())
+        recipe = recipes[0]
+        self.assertEqual(2, recipe.tags.count())
+        for tag in data['tags']:
+            self.assertTrue(recipe.tags.filter(
+                name=tag['name'],
+                user=self.user
+            ).exists())
+
+    def test_create_existing_tag(self):
+        tag = models.Tag.objects.create(user=self.user, name='first')
+        data = {
+            'title': 'sample title',
+            'description': 'test desc',
+            'time_mins': 5,
+            'price': Decimal('5.75'),
+            'tags': [{'name': 'first'},
+                     {'name': 'second'}]
+        }
+        res = self.client.post(RECIPE_URL, data, format='json')
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        recipes = models.Recipe.objects.filter(user=self.user)
+        self.assertEqual(1, recipes.count())
+        recipe = recipes[0]
+        self.assertEqual(2, recipe.tags.count())
+        self.assertIn(tag, recipe.tags.all())
+        for tag in data['tags']:
+            self.assertTrue(recipe.tags.filter(
+                name=tag['name'],
+                user=self.user
+            ).exists())
+
+    def test_create_tag_with_patch_request(self):
+        recipe = create_recipe(self.user)
+        tag = {'tags': [{'name': 'new tag'}]}
+        res = self.client.patch(recipe_detail(recipe.id), tag, format='json')
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        new_tag = models.Tag.objects.get(user=self.user, name='new tag')
+        self.assertIn(new_tag, recipe.tags.all())
+
+    def test_update_existing_tag_of_recipe(self):
+        recipe = create_recipe(user=self.user)
+        old_tag = models.Tag.objects.create(user=self.user, name='old')
+        recipe.tags.add(old_tag)
+        new_tag_obj = models.Tag.objects.create(user=self.user, name='new')
+        new_tag = {'tags': [{'name': 'new'}]}
+        res = self.client.patch(recipe_detail(recipe.id), new_tag, format='json')
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertIn(new_tag_obj, recipe.tags.all())
+        self.assertNotIn(old_tag, recipe.tags.all())
+
+    def test_del_tag(self):
+        recipe = create_recipe(user=self.user)
+        old_tag = models.Tag.objects.create(user=self.user, name='old')
+        recipe.tags.add(old_tag)
+        new_tag = {'tags': []}
+        res = self.client.patch(recipe_detail(recipe.id), new_tag, format='json')
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(0, recipe.tags.count())
