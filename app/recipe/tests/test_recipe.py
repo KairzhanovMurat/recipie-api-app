@@ -234,3 +234,75 @@ class TestPrivateRecipeAPI(TestCase):
         res = self.client.patch(recipe_detail(recipe.id), new_tag, format='json')
         self.assertEqual(res.status_code, status.HTTP_200_OK)
         self.assertEqual(0, recipe.tags.count())
+
+    def test_create_ing(self):
+        data = {
+            'title': 'sample title',
+            'description': 'test desc',
+            'time_mins': 5,
+            'price': Decimal('5.75'),
+            'ingredients': [{'name': 'first'},
+                            {'name': 'second'}]
+        }
+        res = self.client.post(RECIPE_URL, data, format='json')
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        recipes = models.Recipe.objects.filter(user=self.user)
+        self.assertEqual(1, recipes.count())
+        recipe = recipes[0]
+        self.assertEqual(2, recipe.ingredients.count())
+        for ing in data['ingredients']:
+            self.assertTrue(recipe.ingredients.filter(
+                name=ing['name'],
+                user=self.user
+            ).exists())
+
+    def test_create_existing_ing(self):
+        ing = models.Ingredient.objects.create(user=self.user, name='first')
+        data = {
+            'title': 'sample title',
+            'description': 'test desc',
+            'time_mins': 5,
+            'price': Decimal('5.75'),
+            'ingredients': [{'name': 'first'},
+                            {'name': 'second'}]
+        }
+        res = self.client.post(RECIPE_URL, data, format='json')
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        recipes = models.Recipe.objects.filter(user=self.user)
+        self.assertEqual(1, recipes.count())
+        recipe = recipes[0]
+        self.assertEqual(2, recipe.ingredients.count())
+        self.assertIn(ing, recipe.ingredients.all())
+        for ingr in data['ingredients']:
+            self.assertTrue(recipe.ingredients.filter(
+                name=ingr['name'],
+                user=self.user
+            ).exists())
+
+    def test_create_ing_with_patch_request(self):
+        recipe = create_recipe(self.user)
+        ing = {'ingredients': [{'name': 'new ing'}]}
+        res = self.client.patch(recipe_detail(recipe.id), ing, format='json')
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        new_ing = models.Ingredient.objects.get(user=self.user, name='new ing')
+        self.assertIn(new_ing, recipe.ingredients.all())
+
+    def test_update_existing_ing_of_recipe(self):
+        recipe = create_recipe(user=self.user)
+        old_ing = models.Ingredient.objects.create(user=self.user, name='old')
+        recipe.ingredients.add(old_ing)
+        new_ing_obj = models.Ingredient.objects.create(user=self.user, name='new')
+        new_ing = {'ingredients': [{'name': 'new'}]}
+        res = self.client.patch(recipe_detail(recipe.id), new_ing, format='json')
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertIn(new_ing_obj, recipe.ingredients.all())
+        self.assertNotIn(old_ing, recipe.ingredients.all())
+
+    def test_del_ing(self):
+        recipe = create_recipe(user=self.user)
+        old_ing = models.Ingredient.objects.create(user=self.user, name='old')
+        recipe.ingredients.add(old_ing)
+        new_ing = {'ingredients': []}
+        res = self.client.patch(recipe_detail(recipe.id), new_ing, format='json')
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(0, recipe.ingredients.count())

@@ -6,7 +6,8 @@ from rest_framework.authentication import TokenAuthentication
 from core import models
 from .serializers import (RecipeSerializer,
                           RecipeDetailSerializer,
-                          TagSerializer)
+                          TagSerializer,
+                          IngredientSerializer)
 
 
 # Create your views here.
@@ -30,12 +31,25 @@ class RecipeViewSet(viewsets.ModelViewSet):
         serializer.save(user=self.request.user)
 
 
-class TagViewSet(mixins.DestroyModelMixin, mixins.UpdateModelMixin,
-                 mixins.ListModelMixin, viewsets.GenericViewSet):
-    serializer_class = TagSerializer
+class BaseRecipeAttrViewSet(mixins.DestroyModelMixin,
+                            mixins.UpdateModelMixin,
+                            mixins.ListModelMixin,
+                            viewsets.GenericViewSet):
+
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
-    queryset = models.Tag.objects.all()
 
     def get_queryset(self):
         return self.queryset.filter(user=self.request.user).order_by('-name')
+
+
+class TagViewSet(BaseRecipeAttrViewSet):
+    serializer_class = TagSerializer
+    queryset = models.Tag.objects.all()
+
+
+class IngredientViewSet(BaseRecipeAttrViewSet):
+    serializer_class = IngredientSerializer
+    queryset = models.Ingredient.objects.all()
+
+
