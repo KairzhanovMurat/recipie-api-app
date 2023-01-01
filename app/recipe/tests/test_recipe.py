@@ -6,8 +6,15 @@ from django.contrib.auth import get_user_model
 from django.urls import reverse
 from .. import serializers
 from core import models
+import os
+from PIL import Image
+import tempfile
 
 RECIPE_URL = reverse('recipe:recipe-list')
+
+
+def image_upload_url(img_id):
+    return reverse('recipe:recipe-upload-image', args=[img_id])
 
 
 def recipe_detail(res_id):
@@ -306,3 +313,39 @@ class TestPrivateRecipeAPI(TestCase):
         res = self.client.patch(recipe_detail(recipe.id), new_ing, format='json')
         self.assertEqual(res.status_code, status.HTTP_200_OK)
         self.assertEqual(0, recipe.ingredients.count())
+
+
+class ImageUploadTests(TestCase):
+
+    def setUp(self) -> None:
+        self.client = APIClient()
+        self.user = create_new_user(
+            email='test@test.com',
+            password='testpass')
+        self.client.force_authenticate(self.user)
+        self.recipe = create_recipe(user=self.user)
+
+    def tearDown(self) -> None:
+        self.recipe.image.delete()
+
+    def test_upload_image(self):
+        url = image_upload_url(self.recipe.id)
+        with tempfile.NamedTemporaryFile(suffix='.jpg') as img_file:
+            img = Image.new('RGB', (10, 10))
+            img.save(img_file, format='JPEG')
+            img_file.seek(0)
+            payload = {
+                'image': img_file
+            }
+            res = self.client.post(url, payload, format='multipart')
+        self.recipe.refresh_from_db()
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertIn('image', res.data)
+        self.assertTrue(os.path.exists(self.recipe.image.path))
+
+    def test_invalid_image(self):
+        data = {
+            'image': 'nan'
+        }
+        res = self.client.post(image_upload_url(self.recipe.id), data, format='multipart')
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
