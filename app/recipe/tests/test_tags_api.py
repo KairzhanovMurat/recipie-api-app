@@ -1,10 +1,12 @@
+from decimal import Decimal
 from django.test import TestCase
 from django.contrib.auth import get_user_model
 from django.urls import reverse
 from rest_framework.test import APIClient
 from rest_framework import status
-from core.models import Tag
+from core.models import Tag, Recipe
 from recipe.serializers import TagSerializer
+from .test_recipe import create_recipe, create_tag
 
 TAG_URL = reverse('recipe:tag-list')
 
@@ -15,6 +17,8 @@ def get_tag_detail_url(tag_id):
 
 def create_new_user(email='second@mail.nd', password='test', **kwargs):
     return get_user_model().objects.create_user(email, password, **kwargs)
+
+
 
 
 class TestPublicTagsAPI(TestCase):
@@ -71,3 +75,26 @@ class TestPrivateTagsAPI(TestCase):
         res = self.client.delete(get_tag_detail_url(tag.id))
         self.assertEqual(res.status_code, status.HTTP_204_NO_CONTENT)
         self.assertFalse(Tag.objects.filter(user=self.user).exists())
+
+    def test_assigned_tags_only(self):
+        tag1 = create_tag(user=self.user, name='tag1')
+        tag2 = create_tag(user=self.user, name='tag2')
+        rec = create_recipe(user=self.user)
+        rec.tags.add(tag1)
+        res = self.client.get(TAG_URL, {
+            'assigned_only': 1}
+                              )
+        self.assertIn(TagSerializer(tag1).data, res.data)
+        self.assertNotIn(TagSerializer(tag2).data, res.data)
+
+    def test_assigned_only_unique(self):
+        tag1 = create_tag(user=self.user, name='tag1')
+        create_tag(user=self.user, name='tag2')
+        rec1 = create_recipe(user=self.user)
+        rec2 = create_recipe(user=self.user, title='super')
+        rec1.tags.add(tag1)
+        rec2.tags.add(tag1)
+        res = self.client.get(TAG_URL, {
+            'assigned_only': 1}
+                              )
+        self.assertEqual(1, len(res.data))

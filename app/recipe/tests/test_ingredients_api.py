@@ -5,6 +5,7 @@ from rest_framework.test import APIClient
 from rest_framework import status
 from core.models import Ingredient
 from recipe.serializers import IngredientSerializer
+from .test_recipe import create_recipe
 
 ING_URL = reverse('recipe:ingredient-list')
 
@@ -71,3 +72,26 @@ class TestPrivateTagsAPI(TestCase):
         res = self.client.delete(get_ing_detail_url(ing.id))
         self.assertEqual(res.status_code, status.HTTP_204_NO_CONTENT)
         self.assertFalse(Ingredient.objects.filter(user=self.user).exists())
+
+    def test_assigned_ingredients_only(self):
+        ing1 = self.create_ing(name='ing1')
+        ing2 = self.create_ing(name='ing2')
+        rec = create_recipe(user=self.user)
+        rec.ingredients.add(ing1)
+        res = self.client.get(ING_URL, {
+            'assigned_only': 1}
+                              )
+        self.assertIn(IngredientSerializer(ing1).data, res.data)
+        self.assertNotIn(IngredientSerializer(ing2).data, res.data)
+
+    def test_assigned_only_unique(self):
+        ing1 = self.create_ing(name='ing1')
+        self.create_ing(name='ing2')
+        rec1 = create_recipe(user=self.user)
+        rec2 = create_recipe(user=self.user, title='super')
+        rec1.ingredients.add(ing1)
+        rec2.ingredients.add(ing1)
+        res = self.client.get(ING_URL, {
+            'assigned_only': 1}
+                              )
+        self.assertEqual(1, len(res.data))

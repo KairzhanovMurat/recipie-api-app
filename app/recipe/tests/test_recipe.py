@@ -39,6 +39,14 @@ def create_recipe(user, **kwargs):
     return recipe
 
 
+def create_tag(**kwargs):
+    return models.Tag.objects.create(**kwargs)
+
+
+def create_ing(**kwargs):
+    return models.Ingredient.objects.create(**kwargs)
+
+
 class TestPublicRecipeAPI(TestCase):
 
     def setUp(self) -> None:
@@ -313,6 +321,43 @@ class TestPrivateRecipeAPI(TestCase):
         res = self.client.patch(recipe_detail(recipe.id), new_ing, format='json')
         self.assertEqual(res.status_code, status.HTTP_200_OK)
         self.assertEqual(0, recipe.ingredients.count())
+
+    def test_tag_filtering(self):
+        recipe1 = create_recipe(user=self.user, title='first')
+        recipe2 = create_recipe(user=self.user, title='second')
+        tag1 = create_tag(user=self.user, name='first')
+        tag2 = create_tag(user=self.user, name='second')
+        recipe3 = create_recipe(user=self.user, title='third')
+        recipe1.tags.add(tag1)
+        recipe2.tags.add(tag2)
+        params = {'tags': f'{tag1.id},{tag2.id}'}
+        res = self.client.get(RECIPE_URL, params)
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        s1 = serializers.RecipeSerializer(recipe1)
+        s2 = serializers.RecipeSerializer(recipe2)
+        s3 = serializers.RecipeSerializer(recipe3)
+        self.assertNotIn(s3.data, res.data)
+        self.assertIn(s1.data, res.data)
+        self.assertIn(s2.data, res.data)
+
+    def test_ing_filtering(self):
+        recipe1 = create_recipe(user=self.user, title='first')
+        recipe2 = create_recipe(user=self.user, title='second')
+        ing1 = create_ing(user=self.user, name='first')
+        ing2 = create_ing(user=self.user, name='second')
+        recipe3 = create_recipe(user=self.user, title='third')
+        recipe1.ingredients.add(ing1)
+        recipe2.ingredients.add(ing2)
+        params = {'ingredients': f'{ing1.id},{ing2.id}'}
+        res = self.client.get(RECIPE_URL, params)
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        s1 = serializers.RecipeSerializer(recipe1)
+        s2 = serializers.RecipeSerializer(recipe2)
+        s3 = serializers.RecipeSerializer(recipe3)
+        self.assertNotIn(s3.data, res.data)
+        self.assertIn(s1.data, res.data)
+        self.assertIn(s2.data, res.data)
+
 
 
 class ImageUploadTests(TestCase):
